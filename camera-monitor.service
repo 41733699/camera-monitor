@@ -1,0 +1,14 @@
+[Unit]
+Description=Camera Monitor Service
+After=network.target
+
+[Service]
+Type=simple
+User=ctyun
+WorkingDirectory=/home/ctyun/camera-monitor/backend
+ExecStart=/home/ctyun/.hermes/hermes-agent/venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8088
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

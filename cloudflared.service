@@ -1,0 +1,14 @@
+[Unit]
+Description=cloudflared
+After=network.target
+
+[Service]
+TimeoutStartSec=0
+TimeoutStopSec=10
+Type=exec
+ExecStart=/usr/bin/cloudflared --no-autoupdate --protocol http2 tunnel run --token eyJhIjoiZjNmNTRkYTBiNGMzZTUzMTgwOTZiZmIzNWQ4YjNkOTkiLCJ0IjoiMGNkMWM2MDQtOWUyMi00YzQ5LWE4YjUtMGEyZDk0Zjk2YjdjIiwicyI6Ik5EWTNaVGhsTUdNdE4ySmtaQzAwWW1WaUxUazNOakV0TWprNE9UTmxNemcyTjJVNCJ9
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
