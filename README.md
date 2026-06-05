@@ -219,12 +219,38 @@ sudo systemctl enable camera-monitor
 sudo systemctl start camera-monitor
 ```
 
-### 方式二：Docker Compose
+### 方式二：Docker Compose（推荐，开箱即用）
 
 ```bash
+git clone https://github.com/41733699/camera-monitor.git
+cd camera-monitor
+
+# 可选：复制并编辑环境变量
+cp .env.example .env
+
+# 构建并启动（首次需要几分钟下载镜像和构建）
 docker-compose up -d
-# 后端: http://localhost:8000
-# 前端: http://localhost:8080
+
+# 查看日志
+docker-compose logs -f
+
+# 访问：http://localhost:8080
+# 默认账号：admin / admin123
+```
+
+**国内用户加速构建**（编辑 `.env`）：
+```bash
+PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+NPM_REGISTRY=https://registry.npmmirror.com
+```
+
+**常用命令**：
+```bash
+docker-compose up -d        # 启动
+docker-compose down          # 停止
+docker-compose restart       # 重启
+docker-compose logs -f       # 查看日志
+docker-compose up -d --build # 重新构建
 ```
 
 ---

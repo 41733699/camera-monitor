@@ -1,10 +1,12 @@
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-COPY package.json .
+COPY package.json package-lock.json ./
 
-RUN npm install --registry=https://registry.npmmirror.com
+# 可通过 npm mirror 加速（默认用官方源）
+ARG NPM_REGISTRY=https://registry.npmjs.org
+RUN npm install --registry=${NPM_REGISTRY}
 
 COPY . .
 

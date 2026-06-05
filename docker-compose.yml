@@ -2,21 +2,44 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # 国内用户可改为清华源加速: https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     container_name: camera-monitor-backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8088}:8088"
     volumes:
-      - ./backend/data:/app/data
+      - camera-data:/app/data
     environment:
       - DATABASE_URL=sqlite:///data/camera_monitor.db
+      - JWT_SECRET=${JWT_SECRET:-camera-monitor-secret-key-change-in-production}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}
+      - DETECT_TIMEOUT=${DETECT_TIMEOUT:-5}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8088/api/auth/login')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # 国内用户可改为淘宝源加速: https://registry.npmmirror.com
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     container_name: camera-monitor-frontend
     ports:
-      - "8080:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  camera-data:
+    driver: local
