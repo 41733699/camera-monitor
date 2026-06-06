@@ -11,23 +11,21 @@
 
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone https://github.com/41733699/camera-monitor.git
 cd camera-monitor
 
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，填入飞书 Webhook URL
-# vim .env
-
-# 启动服务
+# 使用预构建镜像启动（推荐）
 docker-compose up -d
+
+# 或本地构建启动
+docker-compose -f docker-compose.build.yml up -d --build
 
 # 查看日志
 docker-compose logs -f
 
 # 访问系统
-# 前端界面：http://localhost:8080
-# API 文档：http://localhost:8000/docs
+# 前端界面：http://localhost:8088
+# API 文档：http://localhost:8088/docs
 ```
 
 ## 使用说明

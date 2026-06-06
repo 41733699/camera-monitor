@@ -149,7 +149,7 @@ sudo apt install -y python3 python3-pip python3-venv nodejs npm ffmpeg
 #### 2. 克隆项目
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/camera-monitor.git
+git clone https://github.com/41733699/camera-monitor.git
 cd camera-monitor
 ```
 
@@ -221,6 +221,18 @@ sudo systemctl start camera-monitor
 
 ### 方式二：Docker Compose（推荐，开箱即用）
 
+#### 2a. 使用预构建镜像（推荐，无需本地构建）
+
+```bash
+git clone https://github.com/41733699/camera-monitor.git
+cd camera-monitor
+
+# 直接拉取预构建镜像并启动
+docker-compose -f docker-compose.yml up -d
+```
+
+#### 2b. 本地构建镜像
+
 ```bash
 git clone https://github.com/41733699/camera-monitor.git
 cd camera-monitor
@@ -229,12 +241,14 @@ cd camera-monitor
 cp .env.example .env
 
 # 构建并启动（首次需要几分钟下载镜像和构建）
-docker-compose up -d
+docker-compose -f docker-compose.build.yml up -d --build
+```
 
+```bash
 # 查看日志
 docker-compose logs -f
 
-# 访问：http://localhost:8080
+# 访问：http://localhost:8088
 # 默认账号：admin / admin123
 ```
 
@@ -250,7 +264,7 @@ docker-compose up -d        # 启动
 docker-compose down          # 停止
 docker-compose restart       # 重启
 docker-compose logs -f       # 查看日志
-docker-compose up -d --build # 重新构建
+docker-compose up -d --build # 重新构建（本地构建模式）
 ```
 
 ---

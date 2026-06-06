@@ -1,6 +1,10 @@
 services:
   app:
-    image: ghcr.io/41733699/camera-monitor:latest
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     container_name: camera-monitor
     ports:
       - "${PORT:-8088}:8088"

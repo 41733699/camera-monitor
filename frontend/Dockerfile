@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-# 可通过 npm mirror 加速（默认用官方源）
-ARG NPM_REGISTRY=https://registry.npmjs.org
+# 默认使用淘宝 npm 镜像加速
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 RUN npm install --registry=${NPM_REGISTRY}
 
 COPY . .
