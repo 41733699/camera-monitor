@@ -1,6 +1,7 @@
 """截图服务 — 捕获、清理、文件管理"""
 
 import subprocess
+import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -62,4 +63,101 @@ def capture_screenshot(rtsp_url: str, camera_id: int, timeout: int = 10):
     except Exception as e:
         filepath.unlink(missing_ok=True)
         logger.warning("截图失败 camera_%s: %s", camera_id, e)
+        return None
+
+
+def capture_screenshot_device(camera) -> str | None:
+    """通过厂商 SDK 抓取快照（海康 ISAPI / 大华 CGI）
+
+    在线程池中调用，内部运行异步 httpx 请求。
+    Returns:
+        截图文件路径，失败返回 None
+    """
+    from .device_api import HikvisionClient, DahuaClient
+
+    vendor = getattr(camera, "vendor", "generic") or "generic"
+    ip = camera.device_ip
+    port = camera.http_port or 80
+    channel = camera.channel or 1
+    username = camera.username or ""
+    password = camera.password or ""
+
+    if not ip:
+        logger.warning("设备截图 camera_%s: device_ip 未配置", camera.id)
+        return None
+
+    try:
+        loop = asyncio.new_event_loop()
+        try:
+            if vendor == "hikvision":
+                jpeg_bytes = loop.run_until_complete(
+                    HikvisionClient.capture_snapshot(ip, port, channel, username, password)
+                )
+            elif vendor == "dahua":
+                jpeg_bytes = loop.run_until_complete(
+                    DahuaClient.capture_snapshot(ip, port, channel, username, password)
+                )
+            else:
+                logger.warning("设备截图 camera_%s: 不支持的 vendor=%s", camera.id, vendor)
+                return None
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.warning("设备截图 camera_%s 异常: %s", camera.id, e)
+        return None
+
+    if not jpeg_bytes:
+        return None
+
+    # 保存到文件
+    d = get_camera_screenshot_dir(camera.id)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = d / f"{ts}.jpg"
+    try:
+        filepath.write_bytes(jpeg_bytes)
+        cleanup_old_screenshots(camera.id)
+        logger.info("设备截图 camera_%s 保存成功: %s", camera.id, filepath)
+        return str(filepath)
+    except Exception as e:
+        logger.warning("设备截图 camera_%s 保存失败: %s", camera.id, e)
+        filepath.unlink(missing_ok=True)
+        return None
+
+
+def capture_screenshot_device_sync(camera) -> bytes | None:
+    """通过厂商 SDK 抓取快照，返回原始 JPEG 字节（用于 API 端点）
+
+    Returns:
+        JPEG 字节数据，失败返回 None
+    """
+    from .device_api import HikvisionClient, DahuaClient
+
+    vendor = getattr(camera, "vendor", "generic") or "generic"
+    ip = camera.device_ip
+    port = camera.http_port or 80
+    channel = camera.channel or 1
+    username = camera.username or ""
+    password = camera.password or ""
+
+    if not ip:
+        logger.warning("设备截图 camera_%s: device_ip 未配置", camera.id)
+        return None
+
+    try:
+        loop = asyncio.new_event_loop()
+        try:
+            if vendor == "hikvision":
+                return loop.run_until_complete(
+                    HikvisionClient.capture_snapshot(ip, port, channel, username, password)
+                )
+            elif vendor == "dahua":
+                return loop.run_until_complete(
+                    DahuaClient.capture_snapshot(ip, port, channel, username, password)
+                )
+            else:
+                return None
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.warning("设备截图 camera_%s 异常: %s", camera.id, e)
         return None

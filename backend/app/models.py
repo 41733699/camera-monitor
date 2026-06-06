@@ -32,6 +32,11 @@ class Camera(Base):
     path = Column(String(200), default="/stream1")
     username = Column(String(100), nullable=True)
     password = Column(String(100), nullable=True)
+    # 厂商 SDK 字段
+    vendor = Column(String(20), default="generic", nullable=False)  # generic | hikvision | dahua
+    device_ip = Column(String(200), nullable=True)
+    http_port = Column(Integer, default=80)
+    channel = Column(Integer, default=1)
     # 其他
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True, index=True)
     status = Column(String(20), default="unknown", index=True)

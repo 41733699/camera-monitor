@@ -86,10 +86,18 @@ def onvif_heartbeat_all():
 
         futures = []
         for cam in cameras:
-            fut = executor.submit(
-                _onvif_heartbeat_single,
-                cam.onvif_host, cam.onvif_port_parsed, 5, cam.onvif_path
-            )
+            vendor = getattr(cam, "vendor", "generic") or "generic"
+            if vendor != "generic" and cam.device_ip:
+                fut = executor.submit(
+                    _device_heartbeat,
+                    vendor, cam.device_ip, cam.http_port or 80,
+                    cam.username or "", cam.password or "", 5
+                )
+            else:
+                fut = executor.submit(
+                    _onvif_heartbeat_single,
+                    cam.onvif_host, cam.onvif_port_parsed, 5, cam.onvif_path
+                )
             futures.append((cam.id, cam.onvif_host, cam.onvif_port_parsed, fut))
 
         results = []
@@ -133,6 +141,31 @@ def onvif_heartbeat_all():
 def _onvif_heartbeat_single(domain: str, onvif_port: int, timeout: int = 5, path: str = "/onvif/device_service") -> tuple[bool, int]:
     from .onvif_detector import check_onvif
     return check_onvif(domain, onvif_port, timeout, path)
+
+
+def _device_heartbeat(vendor: str, ip: str, port: int, username: str, password: str, timeout: int = 5) -> tuple[bool, int]:
+    """厂商 SDK 心跳检测（在同步线程中运行异步调用）"""
+    import asyncio
+    from .device_api import HikvisionClient, DahuaClient
+
+    try:
+        loop = asyncio.new_event_loop()
+        try:
+            if vendor == "hikvision":
+                return loop.run_until_complete(
+                    HikvisionClient.check_alive(ip, port, username, password, timeout)
+                )
+            elif vendor == "dahua":
+                return loop.run_until_complete(
+                    DahuaClient.check_alive(ip, port, username, password, timeout)
+                )
+            else:
+                return False, 0
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.debug("厂商心跳检测异常 %s:%s: %s", ip, port, e)
+        return False, 0
 
 
 def _is_quiet_hours(all_settings: dict) -> bool:
@@ -342,10 +375,14 @@ def screenshot_all():
     try:
         db = SessionLocal()
         try:
+            from sqlalchemy import or_
             cameras = db.query(Camera).filter(
                 Camera.status == "online",
                 Camera.screenshot_enabled == True,
-                Camera.rtsp_url.isnot(None),
+                or_(
+                    Camera.rtsp_url.isnot(None),
+                    Camera.device_ip.isnot(None),
+                ),
             ).all()
         finally:
             db.close()
@@ -357,15 +394,22 @@ def screenshot_all():
 
         logger.info("截图任务开始：%d 个在线摄像头", len(cameras))
 
-        from .screenshot import capture_screenshot
+        from .screenshot import capture_screenshot, capture_screenshot_device
         success = fail = 0
 
         for cam in cameras:
             try:
-                result = capture_screenshot(
-                    camera_id=cam.id,
-                    rtsp_url=cam.rtsp_url,
-                )
+                vendor = getattr(cam, "vendor", "generic") or "generic"
+                if vendor != "generic" and cam.device_ip:
+                    result = capture_screenshot_device(cam)
+                elif cam.rtsp_url:
+                    result = capture_screenshot(
+                        camera_id=cam.id,
+                        rtsp_url=cam.rtsp_url,
+                    )
+                else:
+                    fail += 1
+                    continue
                 if result:
                     success += 1
                 else:

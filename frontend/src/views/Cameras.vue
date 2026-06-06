@@ -24,6 +24,11 @@
         <el-table-column label="ONVIF 地址" min-width="200">
           <template #default="{ row }">{{ row.onvif_url }}</template>
         </el-table-column>
+        <el-table-column label="厂商" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" :type="vendorTagType(row.vendor)">{{ vendorLabel(row.vendor) }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="截图" width="70">
           <template #default="{ row }">
             <el-tag v-if="row.screenshot_enabled" type="success" size="small">开</el-tag>
@@ -50,6 +55,7 @@
         <el-table-column label="操作" width="180">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleCheck(row)">检测</el-button>
+            <el-button type="success" link @click="handlePreview(row)">预览</el-button>
             <el-button type="warning" link @click="showEditDialog(row)">编辑</el-button>
             <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
@@ -64,6 +70,29 @@
         <el-form-item label="摄像头名称">
           <el-input v-model="form.name" placeholder="可选，如：大门口摄像头" />
         </el-form-item>
+
+        <el-divider content-position="left">厂商设置</el-divider>
+
+        <el-form-item label="设备厂商">
+          <el-select v-model="form.vendor" placeholder="选择厂商">
+            <el-option label="通用 (Generic)" value="generic" />
+            <el-option label="海康威视 (Hikvision)" value="hikvision" />
+            <el-option label="大华 (Dahua)" value="dahua" />
+          </el-select>
+        </el-form-item>
+
+        <template v-if="form.vendor !== 'generic'">
+          <el-form-item label="设备 IP">
+            <el-input v-model="form.device_ip" placeholder="192.168.1.100" clearable />
+            <div class="form-tip">摄像头的局域网 IP 地址</div>
+          </el-form-item>
+          <el-form-item label="HTTP 端口">
+            <el-input-number v-model="form.http_port" :min="1" :max="65535" />
+          </el-form-item>
+          <el-form-item label="通道号">
+            <el-input-number v-model="form.channel" :min="1" :max="256" />
+          </el-form-item>
+        </template>
 
         <el-divider content-position="left">ONVIF 检测（必填）</el-divider>
 
@@ -107,13 +136,25 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 预览对话框 -->
+    <el-dialog v-model="previewVisible" title="实时预览" width="640px">
+      <div v-if="previewLoading" v-loading="true" style="height:360px"></div>
+      <div v-else>
+        <img v-if="previewImgUrl" :src="previewImgUrl" style="width:100%;border-radius:6px" />
+        <el-empty v-else description="暂无预览画面" />
+      </div>
+      <div v-if="previewStream" style="margin-top:10px;font-size:12px;color:#999">
+        RTSP: {{ previewStream.rtsp_url }} &nbsp; 厂商: {{ vendorLabel(previewStream.vendor) }}
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCameras, createCamera, updateCamera, deleteCamera, checkCamera } from '../api/cameras'
+import { getCameras, createCamera, updateCamera, deleteCamera, checkCamera, getCameraStream, getCameraSnapshot } from '../api/cameras'
 import { getGroups } from '../api/groups'
 import { getStatusType, getStatusText } from '../utils/camera'
 
@@ -123,9 +164,17 @@ const filterGroupId = ref(null)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editId = ref(null)
+const previewVisible = ref(false)
+const previewLoading = ref(false)
+const previewImgUrl = ref('')
+const previewStream = ref(null)
 
 const defaultForm = {
   name: '',
+  vendor: 'generic',
+  device_ip: '',
+  http_port: 80,
+  channel: 1,
   onvif_url: '',
   screenshot_enabled: false,
   rtsp_url: '',
@@ -153,6 +202,10 @@ const showEditDialog = (row) => {
   isEdit.value = true; editId.value = row.id
   form.value = {
     name: row.name || '',
+    vendor: row.vendor || 'generic',
+    device_ip: row.device_ip || '',
+    http_port: row.http_port ?? 80,
+    channel: row.channel ?? 1,
     onvif_url: row.onvif_url || '',
     screenshot_enabled: row.screenshot_enabled || false,
     rtsp_url: row.rtsp_url || '',
@@ -195,6 +248,26 @@ const handleCheck = async (row) => {
     await checkCamera(row.id)
     ElMessage.success('检测完成'); fetchCameras()
   } catch { ElMessage.error('检测失败') }
+}
+
+const vendorLabel = (v) => ({ hikvision: '海康', dahua: '大华', generic: '通用' }[v] || '通用')
+const vendorTagType = (v) => ({ hikvision: 'primary', dahua: 'warning', generic: 'info' }[v] || 'info')
+
+const handlePreview = async (row) => {
+  previewVisible.value = true
+  previewLoading.value = true
+  previewImgUrl.value = ''
+  previewStream.value = null
+  try {
+    const { data } = await getCameraStream(row.id)
+    previewStream.value = data
+    const blob = await getCameraSnapshot(row.id)
+    previewImgUrl.value = URL.createObjectURL(blob.data)
+  } catch (e) {
+    ElMessage.error('获取预览失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    previewLoading.value = false
+  }
 }
 
 onMounted(() => { fetchCameras(); fetchGroups() })
